@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Asset Log Form</title>
+  <style>
+    :root { --primary: #0056b3; --gray: #e9ecef; --dark: #333; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 0; padding: 0; background: #f4f6f8; color: var(--dark); }
+    header { display: flex; background: #fff; border-bottom: 1px solid #ddd; }
+    header button { flex: 1; padding: 14px; font-size: 16px; border: none; background: none; font-weight: bold; cursor: pointer; }
+    header button.active { border-bottom: 3px solid var(--primary); color: var(--primary); }
+    .tab-content { display: none; padding: 20px; max-width: 500px; margin: 0 auto; }
+    .tab-content.active { display: block; }
+    .form-group { margin-bottom: 16px; }
+    label { display: block; margin-bottom: 6px; font-weight: 600; font-size: 14px; }
+    input[type="text"], select, textarea, input[type="file"] { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; font-size: 15px; }
+    .btn-group { display: flex; gap: 8px; flex-wrap: wrap; }
+    .btn-option { flex: 1; min-width: 80px; padding: 10px; text-align: center; background: var(--gray); border: 1px solid #ccc; border-radius: 6px; cursor: pointer; user-select: none; font-size: 14px; }
+    .btn-option.selected { background: var(--primary); color: #fff; border-color: var(--primary); }
+    button[type="submit"] { width: 100%; padding: 14px; background: #28a745; color: #fff; border: none; border-radius: 6px; font-size: 16px; font-weight: bold; cursor: pointer; margin-top: 10px; }
+    button[type="submit"]:disabled { background: #aaa; }
+    #qrContainer { text-align: center; margin-top: 20px; }
+    #qrContainer img { max-width: 250px; border: 1px solid #ddd; padding: 10px; background: #fff; border-radius: 8px; }
+    .hidden { display: none; }
+  </style>
+</head>
+<body>
+
+  <header>
+    <button id="tabFormBtn" class="active" onclick="switchTab('form')">Entry Form</button>
+    <button id="tabQrBtn" onclick="switchTab('qr')">QR Code</button>
+  </header>
+
+  <!-- TAB 1: FORM -->
+  <div id="formTab" class="tab-content active">
+    <form id="logForm">
+      <!-- Action Selector -->
+      <div class="form-group">
+        <label>Action *</label>
+        <div class="btn-group">
+          <div class="btn-option" onclick="selectAction(this, 'Pickup')">Pickup</div>
+          <div class="btn-option" onclick="selectAction(this, 'Drop-off')">Drop-off</div>
+        </div>
+        <input type="hidden" id="action" required>
+      </div>
+
+      <!-- Employee Name -->
+      <div class="form-group">
+        <label for="employeeName">Employee / Driver Name *</label>
+        <input type="text" id="employeeName" required>
+      </div>
+
+      <!-- Site Name -->
+      <div class="form-group">
+        <label for="siteName">Project # / Site Name *</label>
+        <input type="text" id="siteName" required>
+      </div>
+
+      <!-- Location Zone Dropdown -->
+      <div class="form-group">
+        <label for="locationZone">Location Zone *</label>
+        <select id="locationZone" required>
+          <option value="">Select Location...</option>
+          <option value="scaffold yard">scaffold yard</option>
+          <option value="office yard">office yard</option>
+          <option value="office">office</option>
+          <option value="bay one">bay one</option>
+          <option value="bay two">bay two</option>
+          <option value="tool crib">tool crib</option>
+          <option value="other">other</option>
+        </select>
+      </div>
+
+      <!-- Asset Type Selector -->
+      <div class="form-group">
+        <label>Asset Type (Optional)</label>
+        <div class="btn-group">
+          <div class="btn-option" onclick="selectAsset(this, 'Tools')">Tools</div>
+          <div class="btn-option" onclick="selectAsset(this, 'Insulation')">Insulation</div>
+          <div class="btn-option" onclick="selectAsset(this, 'Scaffold')">Scaffold</div>
+          <div class="btn-option" onclick="selectAsset(this, 'Vehicle')">Vehicle</div>
+          <div class="btn-option" onclick="selectAsset(this, 'Trailer')">Trailer</div>
+        </div>
+        <input type="hidden" id="assetType">
+      </div>
+
+      <!-- Dynamic Unit / Plate # -->
+      <div id="assetDetailGroup" class="form-group hidden">
+        <label id="assetDetailLabel" for="unitOrPlate">Detail *</label>
+        <input type="text" id="unitOrPlate">
+      </div>
+
+      <!-- Description -->
+      <div class="form-group">
+        <label for="description">Description (Optional)</label>
+        <textarea id="description" rows="3"></textarea>
+      </div>
+
+      <!-- Photo Upload (Mandatory) -->
+      <div class="form-group">
+        <label for="photo">Photo Attachment *</label>
+        <input type="file" id="photo" accept="image/*" capture="environment" required>
+      </div>
+
+      <button type="submit" id="submitBtn">Submit Entry</button>
+    </form>
+  </div>
+
+  <!-- TAB 2: QR CODE -->
+  <div id="qrTab" class="tab-content">
+    <div id="qrContainer">
+      <h3>Scan to Open Form</h3>
+      <img id="qrImg" src="" alt="Live Site QR Code">
+    </div>
+  </div>
+
+  <script>
+    const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbx-F9FIJxIpXSTQOsAN_I5JQXqtgId3Cm4gYXHCyoeLokJWPvl7a2w5-ZK7VODBWaNl/exec";
+
+    function switchTab(tab) {
+      document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+      document.querySelectorAll('header button').forEach(el => el.classList.remove('active'));
+      if (tab === 'form') {
+        document.getElementById('formTab').classList.add('active');
+        document.getElementById('tabFormBtn').classList.add('active');
+      } else {
+        document.getElementById('qrTab').classList.add('active');
+        document.getElementById('tabQrBtn').classList.add('active');
+      }
+    }
+
+    function selectAction(el, val) {
+      el.parentNode.querySelectorAll('.btn-option').forEach(b => b.classList.remove('selected'));
+      el.classList.add('selected');
+      document.getElementById('action').value = val;
+    }
+
+    function selectAsset(el, val) {
+      const currentVal = document.getElementById('assetType').value;
+      const detailGroup = document.getElementById('assetDetailGroup');
+      const detailInput = document.getElementById('unitOrPlate');
+      const detailLabel = document.getElementById('assetDetailLabel');
+
+      if (currentVal === val) {
+        el.classList.remove('selected');
+        document.getElementById('assetType').value = '';
+        detailGroup.classList.add('hidden');
+        detailInput.removeAttribute('required');
+        return;
+      }
+
+      el.parentNode.querySelectorAll('.btn-option').forEach(b => b.classList.remove('selected'));
+      el.classList.add('selected');
+      document.getElementById('assetType').value = val;
+
+      if (val === 'Vehicle') {
+        detailGroup.classList.remove('hidden');
+        detailLabel.innerText = 'Unit # *';
+        detailInput.setAttribute('required', 'true');
+      } else if (val === 'Trailer') {
+        detailGroup.classList.remove('hidden');
+        detailLabel.innerText = 'License Plate # *';
+        detailInput.setAttribute('required', 'true');
+      } else {
+        detailGroup.classList.add('hidden');
+        detailInput.removeAttribute('required');
+        detailInput.value = '';
+      }
+    }
+
+    // Generate dynamic QR Code for current site URL
+    window.addEventListener('DOMContentLoaded', () => {
+      const pageUrl = encodeURIComponent(window.location.href);
+      document.getElementById('qrImg').src = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${pageUrl}`;
+    });
+
+    // Convert file to Base64
+    const toBase64 = file => new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = error => reject(error);
+    });
+
+    // Handle Form Submission
+    document.getElementById('logForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const submitBtn = document.getElementById('submitBtn');
+      
+      if (!document.getElementById('action').value) {
+        alert('Please select an Action (Pickup or Drop-off).');
+        return;
+      }
+
+      const fileInput = document.getElementById('photo');
+      if (!fileInput.files.length) {
+        alert('Please capture or select a photo.');
+        return;
+      }
+
+      submitBtn.disabled = true;
+      submitBtn.innerText = 'Submitting...';
+
+      try {
+        const photoFile = fileInput.files[0];
+        const base64Photo = await toBase64(photoFile);
+
+        const payload = {
+          action: document.getElementById('action').value,
+          employeeName: document.getElementById('employeeName').value,
+          siteName: document.getElementById('siteName').value,
+          locationZone: document.getElementById('locationZone').value,
+          assetType: document.getElementById('assetType').value,
+          unitOrPlate: document.getElementById('unitOrPlate').value,
+          description: document.getElementById('description').value,
+          photoData: base64Photo,
+          photoMime: photoFile.type
+        };
+
+        const response = await fetch(APPS_SCRIPT_URL, {
+          method: 'POST',
+          body: JSON.stringify(payload)
+        });
+
+        const result = await response.json();
+        if (result.status === 'success') {
+          alert('Form submitted successfully!');
+          document.getElementById('logForm').reset();
+          document.querySelectorAll('.btn-option').forEach(b => b.classList.remove('selected'));
+          document.getElementById('assetDetailGroup').classList.add('hidden');
+        } else {
+          alert('Error submitting form: ' + result.message);
+        }
+      } catch (err) {
+        alert('Submission failed: ' + err.message);
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.innerText = 'Submit Entry';
+      }
+    });
+  </script>
+</body>
+</html>
